@@ -1,9 +1,8 @@
 use iced::{Column, Row, Text, Button, Sandbox, Settings, Element};
-use std::fs;
 use std::path::{PathBuf};
 
-
-enum Node {
+mod utils;
+pub enum Node {
     Folder(PathBuf),
     File(PathBuf),
 }
@@ -16,17 +15,7 @@ impl Node {
     }
 }
 
-fn get_nodes_in_path(path: &PathBuf) -> Result<Vec<Node>, std::io::Error> {
-    let read_dir_items = fs::read_dir(path)?;
-    let mut results: Vec<Node> = Vec::new();
-    for node in read_dir_items {
-        let p = node?.path();
-        let is_dir = fs::metadata(&p)?.is_dir();
-        let node_struct = if is_dir { Node::Folder(p) } else { Node::File(p) };
-        results.push(node_struct);
-    }
-    Ok(results)
-}
+
 
 fn display_nodes<'a> (nodes: &'a Vec<Node>) -> Element<Message> {
     let mut column = Column::new();
@@ -55,10 +44,10 @@ impl Sandbox for FileExplorer {
     type Message = Message;
 
     fn new() -> FileExplorer {
-        let home_dir = std::env::home_dir().unwrap();
-        let files = get_nodes_in_path(&home_dir).unwrap();
+        let home_dir = utils::get_home_directory().unwrap();
+        let files = utils::get_nodes_in_path(&home_dir).unwrap();
         FileExplorer { 
-            path: home_dir, 
+            path: home_dir.clone(), 
             loading: false, 
             files: files, 
             up_button: iced::button::State::new() 
@@ -86,7 +75,7 @@ impl Sandbox for FileExplorer {
             },
             Message::GoUp => {
                 self.path = self.path.parent().unwrap().into();
-                self.files = get_nodes_in_path(&self.path).unwrap();
+                self.files = utils::get_nodes_in_path(&self.path).unwrap();
             }
         }
     }
