@@ -1,21 +1,45 @@
 use iced::{Column, Row, Text, Button, Sandbox, Settings, Element};
+use std::fs;
+use std::path::{PathBuf};
+
 
 enum Node {
-    Folder(String),
-    File(String),
+    Folder(PathBuf),
+    File(PathBuf),
 }
 impl Node {
-    pub fn get_path(&self) -> &str {
+    fn get_name(&self) -> &str {
         match self {
-            Node::Folder(path) => &path,
-            Node::File(path) => &path 
+            Node::File(p) => p.to_str().unwrap(),
+            Node::Folder(p) => p.to_str().unwrap()
         }
     }
 }
 
+fn get_nodes_in_path(path: &PathBuf) -> Result<Vec<Node>, std::io::Error> {
+    let read_dir_items = fs::read_dir(path)?;
+    let mut results: Vec<Node> = Vec::new();
+    for node in read_dir_items {
+        let p = node?.path();
+        let is_dir = fs::metadata(&p)?.is_dir();
+        let node_struct = if is_dir { Node::Folder(p) } else { Node::File(p) };
+        results.push(node_struct);
+    }
+    Ok(results)
+}
+
+fn display_nodes<'a> (nodes: &'a Vec<Node>) -> Element<Message> {
+    let mut column = Column::new();
+    for node in nodes {
+        column = column.push(Text::new(node.get_name()));
+    }
+    column.into()
+    
+}
+
 #[derive(Default)]
 struct FileExplorer {
-    path: String,
+    path: PathBuf,
     loading: bool,
     files: Vec<Node>,
     up_button: iced::button::State
@@ -31,7 +55,14 @@ impl Sandbox for FileExplorer {
     type Message = Message;
 
     fn new() -> FileExplorer {
-        Self::default()
+        let home_dir = std::env::home_dir().unwrap();
+        let files = get_nodes_in_path(&home_dir).unwrap();
+        FileExplorer { 
+            path: home_dir, 
+            loading: false, 
+            files: files, 
+            up_button: iced::button::State::new() 
+        }
     }
     fn title(&self) -> String {
         String::from("Rust File Explorer")
@@ -43,7 +74,7 @@ impl Sandbox for FileExplorer {
                     .on_press(Message::GoUp)
             )
             .push(
-                Row::new()
+                Row::new().push(display_nodes(&self.files))
             )
             .into()
     }
@@ -51,10 +82,11 @@ impl Sandbox for FileExplorer {
     fn update(&mut self, message: Message) {
         match message {
             Message::OpenNode(i) => {
-                self.path += self.files[i].get_path();
+                // self.path += self.files[i].get_path();
             },
             Message::GoUp => {
-
+                self.path = self.path.parent().unwrap().into();
+                self.files = get_nodes_in_path(&self.path).unwrap();
             }
         }
     }
